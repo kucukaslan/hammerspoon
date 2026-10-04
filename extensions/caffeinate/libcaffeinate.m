@@ -308,7 +308,8 @@ static int caffeinate_currentAssertions(lua_State *L) {
 
     CFDictionaryRef assertions = NULL;
     IOReturn result = IOPMCopyAssertionsByProcess(&assertions);
-    if (result != kIOReturnSuccess) {
+    // IOKit can return success without a dictionary when there are no assertions.
+    if (result != kIOReturnSuccess || assertions == NULL) {
         [skin pushNSObject:@{}];
         return 1;
     }

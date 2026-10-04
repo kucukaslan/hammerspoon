@@ -6,16 +6,28 @@ permissions:
   contents: read
 jobs:
   test:
+    name: ${{ matrix.name }}
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: patched
+            ref: 2f0d620e13737a83035c827bd3609c641576c398
+          - name: upstream-baseline
+            ref: 23e387e2805a9890066366e0ac96c71b27f0cfd5
     env:
-      IS_CI: 1
+      IS_CI: "1"
+      TEST_RUNNER_IS_CI: "1"
+      TEST_RUNNER_GITHUB_ACTIONS: "true"
     steps:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: 16.1.0
       - uses: actions/checkout@v4
         with:
+          ref: ${{ matrix.ref }}
           fetch-depth: 0
       - name: Trust the formula already required by upstream CI
         run: |
@@ -28,18 +40,20 @@ jobs:
       - name: Build for testing
         run: ./scripts/github-ci-testbuild.sh
       - name: Run caffeinate regression tests
+        if: matrix.name == 'patched'
         run: >-
           xcodebuild -workspace Hammerspoon.xcworkspace -scheme Release
           -configuration Debug -destination 'platform=macOS'
           -resultBundlePath build/CaffeinateResults
           '-only-testing:Hammerspoon Tests/HScaffeinate' test-without-building
       - name: Run upstream test suite
+        timeout-minutes: 10
         run: ./scripts/github-ci-test.sh
       - name: Upload validation logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: caffeinate-validation
+          name: caffeinate-validation-${{ matrix.name }}
           path: |
             artifacts/
             build/CaffeinateResults.xcresult
